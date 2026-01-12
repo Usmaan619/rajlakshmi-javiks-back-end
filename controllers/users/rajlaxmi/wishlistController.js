@@ -1,95 +1,133 @@
 const asyncHandler = require("express-async-handler");
 const wishlistModel = require("../../../model/users/rajlaxmi/wishlistModel");
 
-// Add to Cart Endpoint
+// ADD TO WISHLIST
 exports.addWishlist = asyncHandler(async (req, res) => {
-  try {
-    const {
-      uid,
-      product_id,
-      product_name,
-      product_price,
-      product_quantity,
-      product_image,
-    } = req.body;
-    console.log("req.body: ", req.body);
+  const {
+    uid,
+    product_id,
+    product_name,
+    product_price,
+    product_quantity = 1,
+    product_image,
+  } = req.body;
 
-    // Validate required fields
-    if (
-      !uid ||
-      !product_id ||
-      !product_name ||
-      !product_price ||
-      !product_quantity ||
-      !product_image
-    ) {
-      return res.json({
-        success: true,
-        message: "Please provide all required fields",
-      });
-    }
-
-    // New wishlist item
-    const newWishlist = {
-      uid,
-      product_id,
-      product_name,
-      product_price,
-      product_quantity,
-      product_image,
-    };
-
-    await wishlistModel.addWishlist(newWishlist);
-    res
-      .status(201)
-      .json({ success: true, message: "Added to Wishlist successfully!" });
-  } catch (error) {
-    console.error("Error adding to wishlist:", error);
-    res.status(500).json({ error: "Failed to add to wishlist" });
+  // Input validation
+  if (
+    !uid ||
+    !product_id ||
+    !product_name ||
+    !product_price ||
+    !product_image
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Missing required fields: uid, product_id, product_name, product_price, product_image",
+    });
   }
+
+  // Check if item already exists
+  const exists = await wishlistModel.checkWishlistItem(uid, product_id);
+  if (exists) {
+    return res.status(409).json({
+      success: false,
+      message: "Item already exists in wishlist",
+    });
+  }
+
+  const result = await wishlistModel.addWishlist({
+    uid,
+    product_id,
+    product_name,
+    product_price,
+    product_quantity,
+    product_image,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Added to wishlist successfully!",
+    data: result,
+  });
 });
 
-// Get All Wishlist
-exports.getAllWishlist = async (req, res) => {
-  try {
-    console.log('req?.query?.uid: ', req?.query?.uid);
-    const wishlist = await wishlistModel.getAllWishlist(req?.query?.uid);
+// GET USER WISHLIST
+exports.getUserWishlist = asyncHandler(async (req, res) => {
+  const { uid } = req.query;
 
-    res.json({ wishlist });
-  } catch (error) {
-    console.error("Error fetching wishlist:", error);
-    res.json({ error: "Failed to fetch wishlist" });
-  }
-};
-
-// Remove wishlist
-exports.removeFromWishlist = asyncHandler(async (req, res) => {
-  try {
-    const { uid, product_id } = req.body;
-
-    console.log(req.body);
-
-    // Validate required fields
-    if (!uid || !product_id) {
-      return res.json({ message: "Please provide both uid and product_id" });
-    }
-
-    // Call the model function to remove the specific product from the wishlist
-    const result = await wishlistModel.removeFromWishlist(uid, product_id);
-
-    if (!result) {
-      return res.json({ message: "Wishlist item not found" });
-    }
-
-    return res.json({
-      message: "Wishlist item removed successfully",
-      data: result,
-    });
-  } catch (error) {
-    console.error("Error removing wishlist item:", error);
-    return res.status(500).json({
-      message: "Server error, failed to remove wishlist item",
-      error: error.message,
+  if (!uid) {
+    return res.status(400).json({
+      success: false,
+      message: "User ID (uid) is required",
     });
   }
+
+  const result = await wishlistModel.getUserWishlist(uid);
+
+  res.json({
+    success: true,
+    message: "Wishlist fetched successfully",
+    ...result,
+  });
+});
+
+// REMOVE SPECIFIC ITEM
+exports.removeWishlistItem = asyncHandler(async (req, res) => {
+  const { uid, product_id } = req.body;
+
+  if (!uid || !product_id) {
+    return res.status(400).json({
+      success: false,
+      message: "uid and product_id are required",
+    });
+  }
+
+  const result = await wishlistModel.removeWishlistItem(uid, product_id);
+
+  res.json({
+    success: result.success,
+    message: result.message,
+    data: result,
+  });
+});
+
+// CLEAR ENTIRE WISHLIST
+exports.clearWishlist = asyncHandler(async (req, res) => {
+  const { uid } = req.body;
+
+  if (!uid) {
+    return res.status(400).json({
+      success: false,
+      message: "User ID (uid) is required",
+    });
+  }
+
+  const result = await wishlistModel.clearUserWishlist(uid);
+
+  res.json({
+    success: true,
+    message: "Wishlist cleared successfully",
+    data: result,
+  });
+});
+
+// GET WISHLIST COUNT
+exports.getWishlistCount = asyncHandler(async (req, res) => {
+  const { uid } = req.query;
+
+  if (!uid) {
+    return res.status(400).json({
+      success: false,
+      message: "User ID (uid) is required",
+    });
+  }
+
+  const count = await wishlistModel.getWishlistCount(uid);
+
+  res.json({
+    success: true,
+    count,
+    message: `User has ${count} items in wishlist`,
+  });
 });

@@ -18,6 +18,8 @@ const {
 
 const userAddressController = require("../../../controllers/users/rajlaxmi/userAddressController");
 
+const homeBannerControllerRajlaxmi = require("../../../controllers/users/rajlaxmi/rajlaxmiHomeBannerController");
+
 // Routes
 
 // Register
@@ -52,12 +54,7 @@ router.post("/contact", contactController.userContact);
 // router.post("/create-order", paymentController.createPaymentAndGenerateUrl);
 // router.post("/status", paymentController.getPhonePeUrlStatusAndUpdatePayment);
 
-// Add wishlist
-router.post("/wishlist", wishlistController.addWishlist);
 
-router.get("/getAllWishlist", wishlistController.getAllWishlist);
-
-router.delete("/removeFromWishlist", wishlistController.removeFromWishlist);
 
 router.post("/createFeedbackRajlaxmi", feedbackController.createReview); // Create
 router.get("/getAllFeedbackRajlaxmi", feedbackController.getAllReviews); // Read All
@@ -83,10 +80,34 @@ router.delete(
   userAddressController.deleteAddress
 );
 
-router.get("/getAllProduct", prodcutController.getAllProducts);
+router.get("/getAllProduct", prodcutController.getProducts);
 
 // razorpay
 router.post("/create-order", createPaymentAndGenerateUrlRazor);
 router.post("/status", getRazorpayStatusAndUpdatePayment);
+
+// Home Banner Routes
+// GET all 4 banners
+router.get(
+  "/home-banners-rajlaxmi",
+  homeBannerControllerRajlaxmi.getHomeBannersRajlaxmi
+);
+
+// Add wishlist
+// router.post("/wishlist", wishlistController.addWishlist);
+// router.get("/getAllWishlist", wishlistController.getAllWishlist);
+// router.delete("/removeFromWishlist", wishlistController.removeFromWishlist);
+
+
+/** wishlist routes start * */
+router.post("/addToWishlist", wishlistController.addWishlist);
+router.get("/getWishlist", wishlistController.getUserWishlist);
+router.post("/removeWishlistItem", wishlistController.removeWishlistItem);
+router.post("/clearWishlist", wishlistController.clearWishlist);
+router.get("/wishlistCount", wishlistController.getWishlistCount);
+/** wishlist routes end */
+
+
+// Export the router
 
 module.exports = router;

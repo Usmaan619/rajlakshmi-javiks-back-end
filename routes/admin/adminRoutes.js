@@ -27,6 +27,8 @@ const imageUploadControllerGauswarn = require("../../controllers/users/gauswarn/
 
 const homeBannerControllerGauswarn = require("../../controllers/users/gauswarn/homeBannerController");
 
+const homeBannerControllerRajlaxmi = require("../../controllers/users/rajlaxmi/rajlaxmiHomeBannerController");
+
 const reelControllerGauswarn = require("../../controllers/users/gauswarn/reelController");
 
 const blogsControllerGauswarn = require("../../controllers/users/gauswarn/blogController");
@@ -43,6 +45,8 @@ const {
 const newsletterController = require("../../controllers/users/gauswarn/newsletterController");
 
 const topBannerOfferController = require("../../controllers/users/gauswarn/topBannerOfferController");
+
+const wishlistControllerRajlaxmi = require("../../controllers/users/rajlaxmi/wishlistController");
 
 // ----------------------------
 // Admin Routes
@@ -93,30 +97,29 @@ router.post(
   "/getAllSalesRajlaxmi",
   monthlyReportController.getAllSalesRajlaxmi
 );
+// Cutomers
+router.get("/getAllCutomerRajlaxmi", registerController.getAllUsers);
 
 // ----------------------------
 // Rajlaxmi Routes
 // ----------------------------
 
-// Cutomers
-router.get("/getAllCutomerRajlaxmi", registerController.getAllUsers);
-
 // Products
-router.post("/createProductRajlaxmi", productControllerRajlaxmi.addProduct);
-router.post("/updateProductById", productControllerRajlaxmi.updateProduct);
-router.post(
-  "/deleteProductRajlaxmiById/:product_id",
-  productControllerRajlaxmi.deleteProduct
-);
-router.get(
-  "/getAllProductsWithFeedback",
-  productControllerRajlaxmi.getAllProductsWithFeedback
-);
-router.get("/getAllProductsRajlaxmi", productControllerRajlaxmi.getAllProducts);
-router.delete(
-  "/deleteProductsRajlaxmiById/:product_id",
-  productControllerRajlaxmi.deleteProduct
-);
+// In your routes file
+// router.post("/createProductRajlaxmi", productControllerRajlaxmi.addProduct);
+// router.get("/getAllProductRajlaxmi", productControllerRajlaxmi.getProducts);
+// router.post("/updateProductById", productControllerRajlaxmi.updateProduct);
+// router.post(
+//   "/deleteProductRajlaxmiById/:product_id",
+//   productControllerRajlaxmi.deleteProduct
+// );
+// Remove the duplicate DELETE route1
+
+// router.get(
+//   "/getAllProductsWithFeedback",
+//   productControllerRajlaxmi.getAllProductsWithFeedback
+// );
+// router.get("/getAllProductsRajlaxmi", productControllerRajlaxmi.getAllProducts);
 
 // orders
 router.post("/createOrderRajlaxmi", orderControllerRajlaxmi.createOrder);
@@ -316,6 +319,66 @@ router.get(
   authMiddleware,
   contactControllerGauswarn.getAllContact
 );
+
+//  <<====================== rajlaxmi home banner routes start ============================================>
+router.post(
+  "/banner-signature-rajlaxmi",
+  homeBannerControllerRajlaxmi.getSignatureRajlaxmi
+);
+
+// GET all 4 banners
+router.get(
+  "/home-banners-rajlaxmi",
+  homeBannerControllerRajlaxmi.getHomeBannersRajlaxmi
+);
+
+router.post(
+  "/home-banners-url-rajlaxmi",
+  homeBannerControllerRajlaxmi.updateHomeBannerByUrlRajlaxmi
+);
+
+// POST all 4 banners
+router.post(
+  "/home-banners-images-rajlaxmi",
+  upload.single("banner"),
+  homeBannerControllerRajlaxmi.updateHomeBannerRajlaxmi
+);
+//  <<====================== rajlaxmi home banner routes end ============================================>>
+
+//  EXISTING ROUTES (Updated parameter consistency)
+router.post("/createProductRajlaxmi", productControllerRajlaxmi.addProduct);
+router.get("/getAllProductRajlaxmi", productControllerRajlaxmi.getProducts);
+
+//  NEW ENHANCED ROUTES
+router.get("/getProductById/:id", productControllerRajlaxmi.getSingleProduct);
+router.post("/updateProductById", productControllerRajlaxmi.updateProduct);
+router.post(
+  "/deleteProductRajlaxmiById/:id",
+  productControllerRajlaxmi.deleteProduct
+); // Hard delete
+
+//  NEW FEATURES ROUTES
+router.get(
+  "/getProductsByCategory/:category",
+  productControllerRajlaxmi.getProductsByCategory
+);
+router.get("/searchProducts", productControllerRajlaxmi.searchProducts);
+router.get(
+  "/getLowStockProducts",
+  productControllerRajlaxmi.getLowStockProducts
+);
+router.post(
+  "/softDeleteProductById/:id",
+  productControllerRajlaxmi.softDeleteProduct
+);
+
+/** wishlist routes start * */
+router.post("/addToWishlist", wishlistControllerRajlaxmi.addWishlist);
+router.get("/getWishlist", wishlistControllerRajlaxmi.getUserWishlist);
+router.post("/removeWishlistItem", wishlistControllerRajlaxmi.removeWishlistItem);
+router.post("/clearWishlist", wishlistControllerRajlaxmi.clearWishlist);
+router.get("/wishlistCount", wishlistControllerRajlaxmi.getWishlistCount);
+/** wishlist routes end */
 
 // ----------------------------
 // Global Error Handler

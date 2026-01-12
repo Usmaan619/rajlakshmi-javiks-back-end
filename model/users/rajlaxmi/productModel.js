@@ -1,189 +1,357 @@
-const { connectToDatabase } = require("../../../config/dbConnection");
+const { withConnection } = require("../../../utils/helper");
 
-// Add Product
-const { v4: uuidv4 } = require("uuid"); // Import UUID package
-const { withConnection, shortenUUID } = require("../../../utils/helper");
+const productModel = {
+  // CREATE - Fixed column count issue
+  createProduct: async (data) => {
+    try {
+      return await withConnection(async (connection) => {
+        const query = `
+          INSERT INTO rajlaxmi_products (
+            product_name, product_description, product_category,
+            product_weight, product_price, purchase_price,
+            product_tax, product_final_price, product_stock, status,
+            product_image_1, product_image_2, product_image_3, product_image_4
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
 
-exports.addProduct = async (productData) => {
-  try {
-    let {
-      product_name,
-      product_description,
-      product_price,
-      product_weight, // Array: [ 5KG, 10KG, 15KG, 20KG ]
-      product_stock,
-      product_category,
-      product_image,
-      product_tax,
-      product_final_price,
-      purchase_price,
-    } = productData;
+        // Fixed: 14 parameters matching 14 columns
+        const [result] = await connection.execute(query, [
+          data.product_name,
+          data.product_description,
+          data.product_category,
+          data.product_weight,
+          data.product_price,
+          data.purchase_price,
+          data.product_tax,
+          data.product_final_price,
+          data.product_stock,
+          data.status || 1, // 10th parameter
+          data.product_image_1,
+          data.product_image_2,
+          data.product_image_3,
+          data.product_image_4, // 14th parameter ✓
+        ]);
 
-    // Generate a unique product_id
-    // const product_id_long = uuidv4();
-    // const product_id = shortenUUID(product_id_long);
+        return result.insertId;
+      });
+    } catch (err) {
+      throw new Error(`Create failed: ${err.message}`);
+    }
+  },
 
-    return await withConnection(async (connection) => {
-      const query = `
-        INSERT INTO rajlaxmi_product 
-        (product_name, product_description, product_price, product_weight, product_stock, product_category, product_image, product_tax, product_final_price, purchase_price) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+  // READ ALL - with ratings
+  getAllProducts: async () => {
+    try {
+      return await withConnection(async (connection) => {
+        const query = `
+          SELECT 
+            p.*,
+            IFNULL(AVG(f.rating), 0) AS average_rating,
+            COUNT(f.id) AS total_reviews
+          FROM rajlaxmi_products p
+          LEFT JOIN rajlaxmi_feedback f ON p.product_id = f.product_id
+          GROUP BY p.product_id
+          ORDER BY p.product_id DESC
+        `;
 
-      const [result] = await connection.execute(query, [
-        product_name || null, // Ensure null for missing values
-        product_description || null,
-        product_price || null,
-        (product_weight = JSON.stringify(product_weight) || null),
-        product_stock || null,
-        product_category || null,
-        product_image || null,
-        product_tax || null,
-        product_final_price || null,
-        purchase_price || null,
-      ]);
+        const [rows] = await connection.execute(query);
+        return rows;
+      });
+    } catch (err) {
+      throw new Error(`Fetch failed: ${err.message}`);
+    }
+  },
 
-      return result.insertId;
-    });
-  } catch (error) {
-    console.log("=====error: ", error);
-    throw new Error(error.message);
-  }
+  // READ SINGLE
+  getProductById: async (productId) => {
+    try {
+      return await withConnection(async (connection) => {
+        const [rows] = await connection.execute(
+          "SELECT * FROM rajlaxmi_products WHERE product_id = ?",
+          [productId]
+        );
+        return rows[0];
+      });
+    } catch (err) {
+      throw new Error(`Fetch single failed: ${err.message}`);
+    }
+  },
+
+  // READ BY CATEGORY
+  getProductsByCategory: async (category) => {
+    try {
+      return await withConnection(async (connection) => {
+        const [rows] = await connection.execute(
+          `SELECT 
+            p.*,
+            IFNULL(AVG(f.rating), 0) AS average_rating,
+            COUNT(f.id) AS total_reviews
+          FROM rajlaxmi_products p
+          LEFT JOIN rajlaxmi_feedback f ON p.product_id = f.product_id
+          WHERE p.product_category = ? AND p.status = 1
+          GROUP BY p.product_id
+          ORDER BY p.product_id DESC`,
+          [category]
+        );
+        return rows;
+      });
+    } catch (err) {
+      throw new Error(`Fetch by category failed: ${err.message}`);
+    }
+  },
+
+  // SEARCH PRODUCTS
+  searchProducts: async (searchTerm) => {
+    try {
+      return await withConnection(async (connection) => {
+        const query = `
+          SELECT 
+            p.*,
+            IFNULL(AVG(f.rating), 0) AS average_rating,
+            COUNT(f.id) AS total_reviews
+          FROM rajlaxmi_products p
+          LEFT JOIN rajlaxmi_feedback f ON p.product_id = f.product_id
+          WHERE p.status = 1 
+          AND (p.product_name LIKE ? OR p.product_description LIKE ?)
+          GROUP BY p.product_id
+          ORDER BY p.product_id DESC
+        `;
+        const [rows] = await connection.execute(query, [
+          `%${searchTerm}%`,
+          `%${searchTerm}%`,
+        ]);
+        return rows;
+      });
+    } catch (err) {
+      throw new Error(`Search failed: ${err.message}`);
+    }
+  },
+
+  // UPDATE - Fixed parameter order
+  updateProduct: async (productId, data) => {
+    try {
+      return await withConnection(async (connection) => {
+        const query = `
+          UPDATE rajlaxmi_products SET
+            product_name = ?, product_description = ?,
+            product_category = ?, product_weight = ?,
+            product_price = ?, purchase_price = ?,
+            product_tax = ?, product_final_price = ?,
+            product_stock = ?, status = ?,
+            product_image_1 = ?, product_image_2 = ?,
+            product_image_3 = ?, product_image_4 = ?
+          WHERE product_id = ?
+        `;
+
+        // Fixed: 15 parameters matching query (14 fields + WHERE condition)
+        const [result] = await connection.execute(query, [
+          data.product_name,
+          data.product_description,
+          data.product_category,
+          data.product_weight,
+          data.product_price,
+          data.purchase_price,
+          data.product_tax,
+          data.product_final_price,
+          data.product_stock,
+          data.status || 1, // 10th parameter
+          data.product_image_1,
+          data.product_image_2,
+          data.product_image_3,
+          data.product_image_4, // 14th parameter
+          productId, // 15th parameter (WHERE)
+        ]);
+
+        return result.affectedRows > 0;
+      });
+    } catch (err) {
+      throw new Error(`Update failed: ${err.message}`);
+    }
+  },
+
+  // SOFT DELETE (Set status = 0)
+  softDeleteProduct: async (productId) => {
+    try {
+      return await withConnection(async (connection) => {
+        const [result] = await connection.execute(
+          "UPDATE rajlaxmi_products SET status = 0 WHERE product_id = ?",
+          [productId]
+        );
+        return result.affectedRows > 0;
+      });
+    } catch (err) {
+      throw new Error(`Soft delete failed: ${err.message}`);
+    }
+  },
+
+  // HARD DELETE
+  deleteProduct: async (productId) => {
+    try {
+      return await withConnection(async (connection) => {
+        const [result] = await connection.execute(
+          "DELETE FROM rajlaxmi_products WHERE product_id = ?",
+          [productId]
+        );
+        return result.affectedRows > 0;
+      });
+    } catch (err) {
+      throw new Error(`Delete failed: ${err.message}`);
+    }
+  },
+
+  // GET LOW STOCK PRODUCTS
+  getLowStockProducts: async () => {
+    try {
+      return await withConnection(async (connection) => {
+        const [rows] = await connection.execute(
+          "SELECT * FROM rajlaxmi_products WHERE product_stock <= 10 AND status = 1 ORDER BY product_stock ASC"
+        );
+        return rows;
+      });
+    } catch (err) {
+      throw new Error(`Low stock fetch failed: ${err.message}`);
+    }
+  },
 };
 
-// Get All Products
-exports.getAllProducts = async () => {
-  try {
-    const connection = await connectToDatabase();
-    const query = `SELECT * FROM rajlaxmi_product`;
-    const [products] = await connection.execute(query);
-    return products;
-  } catch (error) {
-    throw new Error(error.message);
-  }
-};
+module.exports = productModel;
 
-exports.getAllProductsWithFeedback = async () => {
-  try {
-    const connection = await connectToDatabase();
-    const query = `
-      SELECT 
-        p.id,
-        p.product_id,
-        p.product_name,
-        p.product_description,
-        p.product_price,
-        p.product_weight,
-        p.product_stock,
-        p.product_category,
-        p.product_image,
-        p.product_tax,
-        GROUP_CONCAT(f.rating SEPARATOR ', ') AS feedback_ratings,
-        GROUP_CONCAT(f.feedback SEPARATOR ', ') AS feedbacks,
-        GROUP_CONCAT(f.user_name SEPARATOR ', ') AS feedback_user_names,
-        GROUP_CONCAT(f.user_email SEPARATOR ', ') AS feedback_user_emails
-      FROM rajlaxmi_product p
-      LEFT JOIN rajlaxmi_feedback f ON p.product_id = f.product_id
-      GROUP BY p.product_id
-    `;
-    const [productsWithFeedback] = await connection.execute(query);
+// const { withConnection } = require("../../../utils/helper");
 
-    productsWithFeedback.forEach((product) => {
-      const feedback_ratings = product.feedback_ratings
-        .split(", ")
-        .map((rating) => rating.trim());
-      const feedbacks = product.feedbacks
-        .split(", ")
-        .map((feedback) => feedback.trim());
-      const feedback_user_names = product.feedback_user_names
-        .split(", ")
-        .map((name) => name.trim());
-      const feedback_user_emails = product.feedback_user_emails
-        .split(", ")
-        .map((email) => email.trim());
+// // CREATE
+// exports.createProduct = async (data) => {
+//   console.log("data: ", data);
+//   try {
+//     return await withConnection(async (connection) => {
+//       const query = `
+//         INSERT INTO rajlaxmi_products (
+//           product_name, product_description, product_category,
+//           product_weight, product_price, purchase_price,
+//           product_tax, product_final_price, product_stock,
+//           product_image_1, product_image_2, product_image_3, product_image_4
+//         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+//       `;
 
-      const feedbacksArray = feedback_ratings.map((rating, index) => ({
-        feedback_ratings: rating,
-        feedbacks: feedbacks[index] || "",
-        feedback_user_names: feedback_user_names[index] || "",
-        feedback_user_emails: feedback_user_emails[index] || "",
-      }));
+//       const [result] = await connection.execute(query, [
+//         data.product_name,
+//         data.product_description,
+//         data.product_category,
+//         data.product_weight,
+//         data.product_price,
+//         data.purchase_price,
+//         data.product_tax,
+//         data.product_final_price,
+//         data.product_stock,
+//         data.product_image_1,
+//         data.product_image_2,
+//         data.product_image_3,
+//         data.product_image_4,
+//       ]);
 
-      product.feedbacks = feedbacksArray;
-      delete product.feedback_ratings;
-      delete product.feedback_user_names;
-      delete product.feedback_user_emails;
-    });
+//       return result.insertId;
+//     });
+//   } catch (err) {
+//     throw new Error(err.message);
+//   }
+// };
 
-    return productsWithFeedback;
-  } catch (error) {
-    throw new Error(error.message);
-  }
-};
+// // READ ALL
+// exports.getAllProducts = async () => {
+//   try {
+//     return await withConnection(async (connection) => {
+//       const query = `
+//         SELECT
+//           p.*,
+//           IFNULL(AVG(f.rating), 0) AS average_rating,
+//           COUNT(f.id) AS total_reviews
+//         FROM rajlaxmi_products p
+//         LEFT JOIN rajlaxmi_feedback f
+//           ON p.product_id = f.product_id
+//         WHERE p.status = 1
+//         GROUP BY p.product_id
+//         ORDER BY p.product_id DESC
+//       `;
 
-exports.updateProduct = async (productData) => {
-  try {
-    let {
-      product_id,
-      product_name,
-      product_description,
-      product_price,
-      product_weight,
-      product_stock,
-      product_category,
-      product_image,
-      product_tax,
-      purchase_price,
-    } = productData;
+//       const [rows] = await connection.execute(query);
+//       return rows;
+//     });
+//   } catch (err) {
+//     throw new Error(err.message);
+//   }
+// };
 
-    return await withConnection(async (connection) => {
-      const query = `UPDATE
-    rajlaxmi_product
-SET
-    product_name = ?,
-    product_description = ?,
-    product_price = ?,
-    product_weight = ?,
-    product_stock = ?,
-    product_category = ?,
-    product_image = ?,
-    product_tax = ?,
-    purchase_price = ?
-WHERE
-    product_id = ?;`;
+// // READ SINGLE
+// exports.getProductById = async (productId) => {
+//   try {
+//     return await withConnection(async (connection) => {
+//       const [rows] = await connection.execute(
+//         "SELECT * FROM rajlaxmi_products WHERE product_id = ?",
+//         [productId]
+//       );
+//       return rows[0];
+//     });
+//   } catch (err) {
+//     throw new Error(err.message);
+//   }
+// };
 
-      const [result] = await connection.execute(query, [
-        product_name,
-        product_description,
-        product_price,
-        product_weight,
-        product_stock,
-        product_category,
-        product_image,
-        product_tax,
-        purchase_price,
-        product_id,
-      ]);
+// // UPDATE
+// exports.updateProduct = async (productId, data) => {
+//   try {
+//     return await withConnection(async (connection) => {
+//       const query = `
+//         UPDATE rajlaxmi_products SET
+//           product_name = ?,
+//           product_description = ?,
+//           product_category = ?,
+//           product_weight = ?,
+//           product_price = ?,
+//           purchase_price = ?,
+//           product_tax = ?,
+//           product_final_price = ?,
+//           product_stock = ?,
+//           product_image_1 = ?,
+//           product_image_2 = ?,
+//           product_image_3 = ?,
+//           product_image_4 = ?
+//         WHERE product_id = ?
+//       `;
 
-      if (result.affectedRows === 0) {
-        throw new Error("Product not found or no changes made");
-      }
+//       const [result] = await connection.execute(query, [
+//         data.product_name,
+//         data.product_description,
+//         data.product_category,
+//         data.product_weight,
+//         data.product_price,
+//         data.purchase_price,
+//         data.product_tax,
+//         data.product_final_price,
+//         data.product_stock,
+//         data.product_image_1,
+//         data.product_image_2,
+//         data.product_image_3,
+//         data.product_image_4,
+//         productId,
+//       ]);
 
-      return product_id;
-    });
-  } catch (error) {
-    throw new Error(error.message);
-  }
-};
+//       return result.affectedRows;
+//     });
+//   } catch (err) {
+//     throw new Error(err.message);
+//   }
+// };
 
-exports.deleteProduct = async (product_id) => {
-  try {
-    return await withConnection(async (connection) => {
-      const query = "DELETE FROM rajlaxmi_product WHERE product_id = ?";
-      const [result] = await connection.execute(query, [product_id]);
-      return result.affectedRows > 0;
-    });
-  } catch (error) {
-    throw new Error(error.message);
-  }
-};
+// // DELETE (SOFT)
+// exports.deleteProduct = async (productId) => {
+//   try {
+//     return await withConnection(async (connection) => {
+//       const [result] = await connection.execute(
+//         "UPDATE rajlaxmi_products SET status = 0 WHERE product_id = ?",
+//         [productId]
+//       );
+//       return result.affectedRows;
+//     });
+//   } catch (err) {
+//     throw new Error(err.message);
+//   }
+// };
