@@ -29,11 +29,10 @@ router.post("/register", registerController.userRegister);
 router.post("/login", loginController.userLogin);
 
 //  Forget password
-// router.post("/forgotPassword", forgotPasswordController.forgotPassword);
+router.post("/forgotPassword", forgotPasswordController.forgotPassword);
 
-// Re-set Password
-// router.post("/resetPassword", forgotPasswordController.passwordReset);
-
+router.post("/verifyOtp", forgotPasswordController.verifyOtp);
+router.post("/resetPassword", forgotPasswordController.passwordReset);
 // Add To Cart
 router.post("/addtocart", addtocartController.addToCart);
 
@@ -53,8 +52,6 @@ router.post("/contact", contactController.userContact);
 // phonePe routes
 // router.post("/create-order", paymentController.createPaymentAndGenerateUrl);
 // router.post("/status", paymentController.getPhonePeUrlStatusAndUpdatePayment);
-
-
 
 router.post("/createFeedbackRajlaxmi", feedbackController.createReview); // Create
 router.get("/getAllFeedbackRajlaxmi", feedbackController.getAllReviews); // Read All
@@ -98,7 +95,6 @@ router.get(
 // router.get("/getAllWishlist", wishlistController.getAllWishlist);
 // router.delete("/removeFromWishlist", wishlistController.removeFromWishlist);
 
-
 /** wishlist routes start * */
 router.post("/addToWishlist", wishlistController.addWishlist);
 router.get("/getWishlist", wishlistController.getUserWishlist);
@@ -106,7 +102,6 @@ router.post("/removeWishlistItem", wishlistController.removeWishlistItem);
 router.post("/clearWishlist", wishlistController.clearWishlist);
 router.get("/wishlistCount", wishlistController.getWishlistCount);
 /** wishlist routes end */
-
 
 // Export the router
 
