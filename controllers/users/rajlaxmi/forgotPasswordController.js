@@ -3,20 +3,17 @@ const forgotPasswordModal = require("../../../model/users/rajlaxmi/forgotPasswor
 const bcrypt = require("bcryptjs");
 
 exports.forgotPassword = asyncHandler(async (req, res) => {
-  const { user_email } = req.body;
+  const { email } = req.body;
   const hostname = req.hostname;
   console.log(req.body);
   try {
-    const user = await forgotPasswordModal.findUserByEmail(user_email);
+    const user = await forgotPasswordModal.findUserByEmail(email);
     if (!user) {
       return res.json({ message: "Email not found" });
     }
     // console.log(user)
 
-    const otp = await forgotPasswordModal.sendOTPEmail(
-      user?.user_email,
-      hostname
-    );
+    const otp = await forgotPasswordModal.sendOTPEmail(user?.email, hostname);
     console.log("otp", otp);
 
     res.json({ message: "OTP sent your email successfully." });
@@ -31,7 +28,7 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
   try {
     const { otp } = req.body;
 
-    const reset = await forgotPasswordModal.findUserOTP(otp);
+    const reset = await forgotPasswordModal.findUserByOTP(otp);
     if (!reset) {
       return res.json({ success: false, message: "OTP does not found" });
     }
@@ -58,7 +55,7 @@ exports.passwordReset = asyncHandler(async (req, res) => {
     return res.json({ message: "New password is required" });
   }
 
-  const reset = await forgotPasswordModal.findUserOTP(otp);
+  const reset = await forgotPasswordModal.findUserByOTP(otp);
   if (!reset) {
     return res.json({ message: "OTP does not found" });
   }
@@ -73,7 +70,7 @@ exports.passwordReset = asyncHandler(async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update password and clear OTP
-    await forgotPasswordModal.resetPassword(reset.otp, hashedPassword);
+    await forgotPasswordModal.resetPassword(reset.email, hashedPassword);
 
     // await user.save();
     res.json({ message: "password reset successfully" });

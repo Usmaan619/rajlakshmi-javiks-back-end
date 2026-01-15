@@ -3,89 +3,112 @@ const {
 } = require("../../../emailTemplates/forgetPasswordTemplate");
 const {
   createEmailTransporter,
-  connectToDatabase,
+  withConnection,
 } = require("../../../utils/helper");
 
-//generate OTP 6 digits
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000);
-};
+/**
+ * Generate 6-digit OTP
+ */
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000);
 
-const forgotPassword = async (otp) => {
+/**
+ * Save OTP for a specific user
+ */
+const saveUserOTP = async (email, otp) => {
   try {
-    const connection = await connectToDatabase();
-    const query = `INSERT INTO rajlaxmi_user (otp) VALUES (?)`;
-    await connection.execute(query, [otp]);
-    console.log("OTP stored successfully");
+    return await withConnection(async (connection) => {
+      const query = `UPDATE rajlaxmi_user SET otp = ? WHERE email = ?`;
+      await connection.execute(query, [otp, email]);
+    });
   } catch (error) {
-    console.log("Error storing OTP in database:", error);
+    console.error("Error saving OTP:", error);
     throw error;
   }
 };
 
-//send OTP email
+/**
+ * Send OTP Email
+ */
 exports.sendOTPEmail = async (to, hostname) => {
   try {
-    const otp = generateOTP(); // Generate OTP
+    const otp = generateOTP();
     const transporter = await createEmailTransporter();
 
     const mailOptions = {
       from: process.env.SMTP_SIW_USER,
-      to: "",
-      subject: "Forget Password",
+      to,
+      subject: "Forgot Password",
       text: `Your OTP for resetting your password is: ${otp}`,
       html: forgetPasswordTemplate(otp, hostname),
-      //   to: "donotreply-cloustest@medtronic.com",
     };
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("info:", info);
+    await transporter.sendMail(mailOptions);
+    await saveUserOTP(to, otp);
 
-    await forgotPassword(otp);
-
-    return otp;
+    return { message: "OTP sent successfully" };
   } catch (error) {
-    console.log("Error sending OTP email:", error);
+    console.error("Error sending OTP email:", error);
     throw error;
   }
 };
 
+/**
+ * Find user by email
+ */
 exports.findUserByEmail = async (user_email) => {
   try {
-    const connection = await connectToDatabase();
-    const query = `SELECT * FROM rajlaxmi_user WHERE email = ?`;
-    const [rows] = await connection.execute(query, [user_email]);
-    return rows[0] || null;
+    return await withConnection(async (connection) => {
+      const query = `SELECT * FROM rajlaxmi_user WHERE email = ?`;
+      const [rows] = await connection.execute(query, [user_email]);
+      return rows[0] || null;
+    });
   } catch (error) {
-    console.log("Error ", error);
-    return error;
-  }
-};
-
-exports.findUserOTP = async (otp) => {
-  try {
-    const connection = await connectToDatabase();
-    const query = `SELECT * FROM rajlaxmi_user WHERE otp = ?`;
-    const [rows] = await connection.execute(query, [otp]);
-    return rows[0] || null;
-  } catch (error) {
-    console.log("error: ", error);
+    console.error("Error finding user by email:", error);
     throw error;
   }
 };
 
-/// Re-set password
-exports.resetPassword = async (user_email, hashedPassword) => {
-  const query = `UPDATE rajlaxmi_user SET password = ? ,otp = ? , WHERE email = ? `;
-  const [rows] = await dbConnection
-    .promise()
-    .query(query, [hashedPassword, user_email]);
-  if (rows.affectedRows > 0) {
-    return { message: "Password reset sucessfully" };
-  }
+/**
+ * Find user by OTP
+ */
+exports.findUserByOTP = async (otp) => {
   try {
+    return await withConnection(async (connection) => {
+      const query = `SELECT * FROM rajlaxmi_user WHERE otp = ?`;
+      const [rows] = await connection.execute(query, [otp]);
+      return rows[0] || null;
+    });
   } catch (error) {
-    console.log("Error :", error);
+    console.error("Error finding user by OTP:", error);
+    throw error;
+  }
+};
+
+/**
+ * Reset Password
+ */
+exports.resetPassword = async (user_email, hashedPassword) => {
+  try {
+    return await withConnection(async (connection) => {
+      const query = `
+        UPDATE rajlaxmi_user
+        SET password = ?, otp = NULL
+        WHERE email = ?
+      `;
+
+      const [result] = await connection.execute(query, [
+        hashedPassword,
+        user_email,
+      ]);
+
+      if (result.affectedRows === 0) {
+        throw new Error("User not found");
+      }
+
+      return { message: "Password reset successfully" };
+    });
+  } catch (error) {
+    console.error("Error resetting password:", error);
     throw error;
   }
 };
